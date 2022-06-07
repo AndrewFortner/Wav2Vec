@@ -6,8 +6,8 @@ from pydub import AudioSegment
 
 
 
-tokenizer = Wav2Vec2Processor.from_pretrained('facebook/wav2vec2-large-960h-lv60-self')
-model = Wav2Vec2ForCTC.from_pretrained('facebook/wav2vec2-large-960h-lv60-self')
+tokenizer = Wav2Vec2Processor.from_pretrained('facebook/wav2vec2-large-robust-ft-swbd-300h')
+model = Wav2Vec2ForCTC.from_pretrained('facebook/wav2vec2-large-robust-ft-swbd-300h')
 
 
 r = sr.Recognizer()
