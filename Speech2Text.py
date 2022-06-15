@@ -1,20 +1,36 @@
-#from logging.config import listen
 import threading
+import io
 import torch
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 import speech_recognition as sr
-import io
 from pydub import AudioSegment
+from fastapi import FastAPI
 
 tokenizer = Wav2Vec2Processor.from_pretrained('facebook/wav2vec2-large-robust-ft-swbd-300h')
 model = Wav2Vec2ForCTC.from_pretrained('facebook/wav2vec2-large-robust-ft-swbd-300h')
 
 r = sr.Recognizer()
 r.non_speaking_duration = 0.01
-r.pause_threshold = .05
+r.pause_threshold = .03
 
+end = False
 stop_sequence = 'STOP'
 output = []
+app = FastAPI()
+@app.get("/begin")
+def root():
+    #Start script
+    listening = threading.Thread(target = listen)
+    listening.start()
+
+@app.get("/end")
+def stop():
+    #End Script
+    global end
+    end = True
+    print("Stopping")
+    print(toString(output))
+    return {"raw": toString(output)}
 
 def process(input, thread_number):
         data = io.BytesIO(input.get_wav_data())
@@ -35,25 +51,18 @@ def listen():
     with sr.Microphone(sample_rate = 16000) as source:
         print("Say something!")
         thread_number = 0
-        #processing = threading.Thread(target = process, args = (audio,))
-        global end
-        end = False
         while not end:
-            print("listening...")
             audio = r.listen(source)
             if end:
-                del output[-1]
-                for x in output:
-                    if x == '':
-                        output.remove(x)
-                print(*output, sep = ' ')
                 return
-            print("finsihed listening")
             output.append('')
             processing = threading.Thread(target = process, args = (audio, thread_number))
             processing.start()
-            #process(audio)
             thread_number += 1
 
-listening = threading.Thread(target = listen)
-listening.start()
+def toString(list):
+    str = ''
+    for i in list:
+        if(i != ''):
+            str += i + ' '
+    return str
