@@ -4,7 +4,8 @@ import torch
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 import speech_recognition as sr
 from pydub import AudioSegment
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
+import librosa
 
 tokenizer = Wav2Vec2Processor.from_pretrained('facebook/wav2vec2-large-robust-ft-swbd-300h')
 model = Wav2Vec2ForCTC.from_pretrained('facebook/wav2vec2-large-robust-ft-swbd-300h')
@@ -14,11 +15,21 @@ r.non_speaking_duration = 0.01
 r.pause_threshold = .03
 
 end = False
-stop_sequence = 'STOP'
 output = []
 app = FastAPI()
-@app.get("/begin")
-def root():
+@app.post("/")
+async def upload(file: UploadFile = File()):
+    c = await file.read()
+    audio, rate = librosa.load(c, sr = 16000)
+    input_values = tokenizer(audio, sampling_rate = rate, return_tensors = "pt").input_values
+    logits = model(input_values).logits
+    prediction = torch.argmax(logits, dim = -1)
+    transcription = tokenizer.batch_decode(prediction)[0]
+    return {"text": transcription}
+
+
+@app.post("/begin")
+def begin():
     #Start script
     listening = threading.Thread(target = listen)
     listening.start()
@@ -30,23 +41,19 @@ def stop():
     end = True
     print("Stopping")
     print(toString(output))
-    return {"raw": toString(output)}
+    return {"text": toString(output)}
 
 def process(input, thread_number):
         data = io.BytesIO(input.get_wav_data())
         clip = AudioSegment.from_file(data)
         x = torch.FloatTensor(clip.get_array_of_samples())
-        inputs = tokenizer(x, sampling_rate = 16000, return_tensors = 'pt', padding = 'longest').input_values
+        inputs = tokenizer(x, sampling_rate = 16000, return_tensors = 'pt', padding = 'do_not_pad').input_values
         logits = model(inputs).logits
         tokens = torch.argmax(logits, axis = -1)
         text = tokenizer.batch_decode(tokens)
         output[thread_number] = text[0]
         print(text[0])
-        if text[0] == stop_sequence:
-            print("stopping")
-            global end
-            end = True
-
+        print("done processing")
 def listen():
     with sr.Microphone(sample_rate = 16000) as source:
         print("Say something!")
