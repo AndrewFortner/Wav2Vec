@@ -18,15 +18,10 @@ end = False
 output = []
 app = FastAPI()
 @app.post("/")
-async def upload(file: UploadFile = File()):
-    c = await file.read()
-    audio, rate = librosa.load(c, sr = 16000)
-    input_values = tokenizer(audio, sampling_rate = rate, return_tensors = "pt").input_values
-    logits = model(input_values).logits
-    prediction = torch.argmax(logits, dim = -1)
-    transcription = tokenizer.batch_decode(prediction)[0]
-    return {"text": transcription}
-
+async def upload(file: UploadFile):
+    data = io.BytesIO(await file.read())
+    process_wav(data, 0)
+    return {"text": toString(output)}
 
 @app.post("/begin")
 def begin():
@@ -43,8 +38,17 @@ def stop():
     print(toString(output))
     return {"text": toString(output)}
 
-def process(input, thread_number):
-        data = io.BytesIO(input.get_wav_data())
+def process_wav(data, thread_number):
+    output.append('')
+    audio, rate = librosa.load(data, sr = 16000)
+    input_values = tokenizer(audio, sampling_rate = rate, return_tensors = "pt").input_values
+    logits = model(input_values).logits
+    prediction = torch.argmax(logits, dim = -1)
+    output[thread_number] = tokenizer.batch_decode(prediction)[0]
+    print("Done processing wav")
+
+def process(data, thread_number):
+        output.append('')
         clip = AudioSegment.from_file(data)
         x = torch.FloatTensor(clip.get_array_of_samples())
         inputs = tokenizer(x, sampling_rate = 16000, return_tensors = 'pt', padding = 'do_not_pad').input_values
@@ -54,6 +58,7 @@ def process(input, thread_number):
         output[thread_number] = text[0]
         print(text[0])
         print("done processing")
+
 def listen():
     with sr.Microphone(sample_rate = 16000) as source:
         print("Say something!")
@@ -62,8 +67,7 @@ def listen():
             audio = r.listen(source)
             if end:
                 return
-            output.append('')
-            processing = threading.Thread(target = process, args = (audio, thread_number))
+            processing = threading.Thread(target = process, args = (io.BytesIO(audio.get_wav_data()), thread_number))
             processing.start()
             thread_number += 1
 
@@ -72,4 +76,4 @@ def toString(list):
     for i in list:
         if(i != ''):
             str += i + ' '
-    return str
+    return str.rstrip(str[-1])
