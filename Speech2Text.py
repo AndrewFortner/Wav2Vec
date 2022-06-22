@@ -4,7 +4,7 @@ import torch
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 import speech_recognition as sr
 from pydub import AudioSegment
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile
 import librosa
 
 tokenizer = Wav2Vec2Processor.from_pretrained('facebook/wav2vec2-large-robust-ft-swbd-300h')
