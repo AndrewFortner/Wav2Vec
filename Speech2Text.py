@@ -1,29 +1,31 @@
 import threading
 import io
 import torch
-from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
+from transformers import Wav2Vec2Processor, HubertForCTC, Wav2Vec2ConformerForCTC
 import speech_recognition as sr
 from pydub import AudioSegment
-from fastapi import FastAPI, UploadFile
+from fastapi import FastAPI, UploadFile, Form
 import librosa
 
-tokenizer = Wav2Vec2Processor.from_pretrained('facebook/wav2vec2-large-robust-ft-swbd-300h')
-model = Wav2Vec2ForCTC.from_pretrained('facebook/wav2vec2-large-robust-ft-swbd-300h')
+tokenizer = Wav2Vec2Processor.from_pretrained('facebook/hubert-large-ls960-ft')
+model = HubertForCTC.from_pretrained('facebook/hubert-large-ls960-ft')
 
 r = sr.Recognizer()
-r.non_speaking_duration = 0.01
-r.pause_threshold = .03
+r.non_speaking_duration = 0.001
+r.pause_threshold = .005
+r.dynamic_energy_threshold = False
 
 end = False
 output = []
 app = FastAPI()
 @app.post("/")
-async def upload(file: UploadFile):
+async def upload(file: UploadFile, sr: int = Form()):
     data = io.BytesIO(await file.read())
-    process_wav(data, 0)
-    return {"text": toString(output)}
+    print(sr)
+    print(file.filename)
+    return {"text": process_wav(data, sr)}
 
-@app.post("/begin")
+@app.get("/begin")
 def begin():
     #Start script
     listening = threading.Thread(target = listen)
@@ -38,33 +40,37 @@ def stop():
     print(toString(output))
     return {"text": toString(output)}
 
-def process_wav(data, thread_number):
+def process_wav(data, sample_rate):
     output.append('')
-    audio, rate = librosa.load(data, sr = 16000)
+    audio, rate = librosa.load(data, sr = sample_rate)
     input_values = tokenizer(audio, sampling_rate = rate, return_tensors = "pt").input_values
     logits = model(input_values).logits
     prediction = torch.argmax(logits, dim = -1)
-    output[thread_number] = tokenizer.batch_decode(prediction)[0]
-    print("Done processing wav")
+    return tokenizer.batch_decode(prediction)[0]
 
 def process(data, thread_number):
         output.append('')
-        clip = AudioSegment.from_file(data)
-        x = torch.FloatTensor(clip.get_array_of_samples())
-        inputs = tokenizer(x, sampling_rate = 16000, return_tensors = 'pt', padding = 'do_not_pad').input_values
+        # clip = AudioSegment.from_file(data)
+        # x = torch.FloatTensor(clip.get_array_of_samples())
+        audio, rate = librosa.load(data, sr = 16000)
+        tokenized = tokenizer(audio, sampling_rate = rate, return_tensors = 'pt', padding = 'longest')
+        inputs = tokenized.input_values
         logits = model(inputs).logits
         tokens = torch.argmax(logits, axis = -1)
         text = tokenizer.batch_decode(tokens)
         output[thread_number] = text[0]
         print(text[0])
-        print("done processing")
 
 def listen():
     with sr.Microphone(sample_rate = 16000) as source:
-        print("Say something!")
+        print("Say Something!")
+        # r.adjust_for_ambient_noise(source)
+        # print(r.energy_threshold)
+        r.energy_threshold = 120
         thread_number = 0
         while not end:
             audio = r.listen(source)
+            print("---------------")
             if end:
                 return
             processing = threading.Thread(target = process, args = (io.BytesIO(audio.get_wav_data()), thread_number))
