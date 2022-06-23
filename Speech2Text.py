@@ -1,9 +1,8 @@
 import threading
 import io
 import torch
-from transformers import Wav2Vec2Processor, HubertForCTC, Wav2Vec2ConformerForCTC
+from transformers import Wav2Vec2Processor, HubertForCTC
 import speech_recognition as sr
-from pydub import AudioSegment
 from fastapi import FastAPI, UploadFile, Form
 import librosa
 
@@ -21,8 +20,6 @@ app = FastAPI()
 @app.post("/")
 async def upload(file: UploadFile, sr: int = Form()):
     data = io.BytesIO(await file.read())
-    print(sr)
-    print(file.filename)
     return {"text": process_wav(data, sr)}
 
 @app.get("/begin")
@@ -36,7 +33,6 @@ def stop():
     #End Script
     global end
     end = True
-    print("Stopping")
     print(toString(output))
     return {"text": toString(output)}
 
