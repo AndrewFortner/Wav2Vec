@@ -14,7 +14,7 @@ In order to run application for transcription of a file:
 3. Make a POST request to "http://127.0.0.1:8000/transcribe-file" using a form with integer "sr" as sample rate and wav file "file" as the file you want to trasncribe.
 4. Wait for the file to finish processing. The full transcription will be returned in JSON format to http://127.0.0.1:8000/transcribe-file. Typically transcription of a wav file takes about 1.5 seconds of processing for every 1 second of audio in the file.
 
-In order to run application for text to speech (without translation):
+In order to run application for text to speech:
 1. Navigate to the directory where you installed tts_fastspeech2.py, and type: "uvicorn tts_fastspeech2:app" Note that if this is your first time running the program some files will be installed for you. It may take some time as the model is quite large.
 2. Wait a couple of seconds for the sever to startup. Once you see the message that says "INFO:     Application startup complete." then the application is ready to run.
 3. Make a POST request to "http://127.0.0.1:8000/synthesize" using a form with string "text" as the text you want to synthesize.
