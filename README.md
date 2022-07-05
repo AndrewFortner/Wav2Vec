@@ -1,4 +1,4 @@
-#Running the program
+# Running The Program
 Once you have downloaded all .py files, naviate to the directory where you have saved the files and type: "pip install -r requirements.txt" on the command line to install required dependencies. This may take some time.
 
 In order to run the application for ASR using microphone:
