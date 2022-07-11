@@ -54,10 +54,10 @@ async def translate_transcription(file: UploadFile, sr: int = Form(), out_lang: 
     data = io.BytesIO(await file.read())
     return {"text": process_wav(data, sr, out_lang)}
 
-@app.post("/transcribe-file-en-de")
+@app.post("/transcribe-file-en-es")
 async def translate_transcription(file: UploadFile, sr: int = Form()):
     data = io.BytesIO(await file.read())
-    return {"text": process_wav(data, sr, "de_DE")}
+    return {"text": process_wav(data, sr, "es_XX")}
 
 #English speech into out_lang text
 @app.post("/asr-live-translate")
@@ -92,14 +92,14 @@ def begin():
         end = True
         return {"text": toString(output)}
 
-@app.get("/asr-live-en-de")
+@app.get("/asr-live-en-es")
 def begin():
     #Start script
     global TRANSLATE_LANG
     global end
     global num_starts
     num_starts += 1
-    TRANSLATE_LANG = "de_DE"
+    TRANSLATE_LANG = "es_XX"
     if num_starts % 2 == 1:
         end = False
         listening = threading.Thread(target = listen)
@@ -137,16 +137,21 @@ def synthesize(text : str = Form()):
     audio.seek(0)
     return StreamingResponse(audio, media_type = "audio/wav")
 
-@app.post("/tts-en-to-de")
+@app.post("/tts-en-to-es")
 def tts_en_to_es(text : str = Form()):
     #Translate
     in_lang = "en_XX"
-    out_lang = "de_DE"
+    out_lang = "es_XX"
     translation_tokenizer.src_lang = in_lang
     encode = translation_tokenizer(text, return_tensors = "pt")
     tokens = translation_model.generate(**encode, forced_bos_token_id=translation_tokenizer.lang_code_to_id[out_lang])
-    text = translation_tokenizer.batch_decode(tokens, skip_special_tokens=True)
+    text = translation_tokenizer.batch_decode(tokens, skip_special_tokens=True)[0]
+    print(text)
     #TTS
+    models, cfg, task = load_model_ensemble_and_task_from_hf_hub(
+        "facebook/tts_transformer-es-css10",
+        arg_overrides={"vocoder": "hifigan", "fp16": False}
+    )
     TTSHubInterface.update_cfg_with_data_cfg(cfg, task.data_cfg)
     generator = task.build_generator(models, cfg)
     sample = TTSHubInterface.get_model_input(task, text)
@@ -168,7 +173,7 @@ def process_wav(data, sample_rate, out_lang):
     translation_tokenizer.src_lang = 'en_XX'
     encode = translation_tokenizer(text, return_tensors = "pt")
     tokens = translation_model.generate(**encode, forced_bos_token_id=translation_tokenizer.lang_code_to_id[out_lang])
-    translated = translation_tokenizer.batch_decode(tokens, skip_special_tokens=True)
+    translated = translation_tokenizer.batch_decode(tokens, skip_special_tokens=True)[0]
     return translated
 
 #ASR of microphone
@@ -186,7 +191,7 @@ def process(data, thread_number):
             translation_tokenizer.src_lang = 'en_XX'
             encode = translation_tokenizer(text, return_tensors = "pt")
             tokens = translation_model.generate(**encode, forced_bos_token_id=translation_tokenizer.lang_code_to_id[TRANSLATE_LANG])
-            text = translation_tokenizer.batch_decode(tokens, skip_special_tokens=True)
+            text = translation_tokenizer.batch_decode(tokens, skip_special_tokens=True)[0]
         output[thread_number] = text
         print(text)
 
